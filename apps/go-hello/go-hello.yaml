@@ -17,7 +17,7 @@ spec:
         - name: ghcr
       containers:
         - name: go-hello
-          image: ghcr.io/leinonen/go-hello:3bdcaeb12030f0ca37a752e23fdaea0025fe5b51
+          image: ghcr.io/leinonen/go-hello:21b876a788a99004f21d6eb527d6fcd8cc4b7d0f
           ports:
             - containerPort: 8080
           readinessProbe:
