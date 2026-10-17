@@ -1,0 +1,40 @@
+# Creates Route 53 records for Ingress hosts outside *.k8s.leinonen.ninja
+# (that wildcard is Terraform's). Upsert-only: it never deletes, so remove
+# stale records by hand. AWS credentials come from the instance role.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-dns
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/external-dns
+    chart: external-dns
+    targetRevision: 1.23.0
+    helm:
+      valuesObject:
+        provider:
+          name: aws
+        env:
+          - name: AWS_DEFAULT_REGION
+            value: eu-north-1
+        sources:
+          - ingress
+        domainFilters:
+          - leinonen.ninja
+          - leinonen.se
+        excludeDomains:
+          - k8s.leinonen.ninja
+        policy: upsert-only
+        registry: txt
+        txtOwnerId: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-dns
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,26 @@
+# Cluster-wide config that needs the CRDs from the charts above; retries
+# until they exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/leinonen/k8s-gitops
+    targetRevision: main
+    path: platform
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: -1
+      backoff:
+        duration: 30s
+        maxDuration: 5m
