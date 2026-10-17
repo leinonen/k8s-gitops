@@ -41,6 +41,15 @@ spec:
       remoteRef: { key: /k8s/myapp/db-password }
 ```
 
+## Databases
+
+Apps can use `shared-postgres` (infrastructure `stacks/postgres`; the `k8s` security group is allowed).
+Create a role and database per app (infrastructure `docs/db-migration.md` step 1a), put the
+password in SSM under `/k8s/<app>/`, and build `DATABASE_URL` in an ExternalSecret template.
+Connect with `sslmode=verify-full&sslrootcert=/etc/rds/ca.pem`: copy `apps/go-hello/rds-ca.yaml`
+(RDS eu-north-1 root CAs) into the app and mount it at `/etc/rds`. The Secret only reaches the pod
+at startup, so after changing it run `kubectl rollout restart`. See `apps/go-hello`.
+
 ## Access
 
 kubectl goes through an SSM tunnel; see the infrastructure README (Kubernetes section).

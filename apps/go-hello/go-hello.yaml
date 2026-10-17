@@ -15,6 +15,10 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr
+      volumes:
+        - name: rds-ca
+          configMap:
+            name: rds-ca
       containers:
         - name: go-hello
           image: ghcr.io/leinonen/go-hello:21b876a788a99004f21d6eb527d6fcd8cc4b7d0f
@@ -23,6 +27,10 @@ spec:
           envFrom:
             - secretRef:
                 name: db
+          volumeMounts:
+            - name: rds-ca
+              mountPath: /etc/rds
+              readOnly: true
           readinessProbe:
             httpGet: { path: /readyz, port: 8080 }
           livenessProbe:
@@ -97,7 +105,7 @@ spec:
     name: db
     template:
       data:
-        DATABASE_URL: 'postgres://go_hello:{{ .password }}@shared-postgres.cle7r5x9plzj.eu-north-1.rds.amazonaws.com:5432/go_hello?sslmode=require'
+        DATABASE_URL: 'postgres://go_hello:{{ .password }}@shared-postgres.cle7r5x9plzj.eu-north-1.rds.amazonaws.com:5432/go_hello?sslmode=verify-full&sslrootcert=/etc/rds/ca.pem'
   data:
     - secretKey: password
       remoteRef: { key: /k8s/go-hello/db-password }
