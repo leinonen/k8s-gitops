@@ -1,0 +1,84 @@
+# Image tag is bumped by leinonen/go-hello CI on every push to main.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-hello
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-hello
+  template:
+    metadata:
+      labels:
+        app: go-hello
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      containers:
+        - name: go-hello
+          image: ghcr.io/leinonen/go-hello:latest
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-hello
+spec:
+  selector:
+    app: go-hello
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-hello
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: go-hello.k8s.leinonen.ninja
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: go-hello
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - go-hello.k8s.leinonen.ninja
+      secretName: go-hello-tls
+---
+# Pull secret for the private GHCR package: classic PAT with read:packages.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: ghcr
+spec:
+  secretStoreRef: { kind: ClusterSecretStore, name: ssm }
+  target:
+    name: ghcr
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: '{"auths":{"ghcr.io":{"auth":"{{ printf "leinonen:%s" .token | b64enc }}"}}}'
+  data:
+    - secretKey: token
+      remoteRef: { key: /k8s/go-hello/ghcr-token }
