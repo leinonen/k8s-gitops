@@ -20,8 +20,11 @@ spec:
           image: ghcr.io/leinonen/go-hello:21b876a788a99004f21d6eb527d6fcd8cc4b7d0f
           ports:
             - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: db
           readinessProbe:
-            httpGet: { path: /healthz, port: 8080 }
+            httpGet: { path: /readyz, port: 8080 }
           livenessProbe:
             httpGet: { path: /healthz, port: 8080 }
           resources:
@@ -82,3 +85,19 @@ spec:
   data:
     - secretKey: token
       remoteRef: { key: /k8s/go-hello/ghcr-token }
+---
+# DATABASE_URL for database go_hello on shared-postgres (infrastructure stacks/postgres).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: db
+spec:
+  secretStoreRef: { kind: ClusterSecretStore, name: ssm }
+  target:
+    name: db
+    template:
+      data:
+        DATABASE_URL: 'postgres://go_hello:{{ .password }}@shared-postgres.cle7r5x9plzj.eu-north-1.rds.amazonaws.com:5432/go_hello?sslmode=require'
+  data:
+    - secretKey: password
+      remoteRef: { key: /k8s/go-hello/db-password }
