@@ -1,4 +1,4 @@
-# Copied to k8s-gitops apps/guestbook/ by CI, with ghcr.io/leinonen/guestbook:311026e426eb68041c2ab57b80b0c26809b12113 set to the built image.
+# CI renders this into k8s-gitops apps/guestbook/ with ghcr.io/leinonen/app-factory/guestbook:f24ffad50bc6ad99258d993ba79b80e6d9b53406 set to the built image.
 # Namespace guestbook is created by ArgoCD.
 apiVersion: apps/v1
 kind: Deployment
@@ -18,7 +18,7 @@ spec:
         - name: ghcr
       containers:
         - name: guestbook
-          image: ghcr.io/leinonen/guestbook:311026e426eb68041c2ab57b80b0c26809b12113
+          image: ghcr.io/leinonen/app-factory/guestbook:f24ffad50bc6ad99258d993ba79b80e6d9b53406
           ports:
             - containerPort: 8080
           readinessProbe:
