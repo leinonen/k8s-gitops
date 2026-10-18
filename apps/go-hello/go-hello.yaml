@@ -35,6 +35,12 @@ spec:
             httpGet: { path: /readyz, port: 8080 }
           livenessProbe:
             httpGet: { path: /healthz, port: 8080 }
+          # Keep serving while Traefik drops the pod from its endpoints, so a
+          # rollout doesn't send requests to a pod that has stopped listening.
+          # Native sleep action: the distroless image has no sleep binary.
+          lifecycle:
+            preStop:
+              sleep: { seconds: 5 }
           resources:
             requests:
               cpu: 10m
