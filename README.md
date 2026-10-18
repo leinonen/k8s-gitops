@@ -17,6 +17,9 @@ The box's cloud-init installs ArgoCD and the `root` Application, which syncs `bo
    (or `letsencrypt-staging` while testing), and a `tls` block. See `apps/hello`.
 3. Push to `main`. ArgoCD picks it up within ~3 minutes.
 
+Apps built with [leinonen/app-factory](https://github.com/leinonen/app-factory) are written
+here by their own CI from the app repo's `deploy/`: edit them there, not here.
+
 ## Hostnames
 
 - `<anything>.k8s.leinonen.ninja` already resolves to the box (wildcard in the dns stack). Just use it.
