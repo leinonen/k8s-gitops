@@ -21,7 +21,7 @@ spec:
             name: rds-ca
       containers:
         - name: go-hello
-          image: ghcr.io/leinonen/go-hello:21b876a788a99004f21d6eb527d6fcd8cc4b7d0f
+          image: ghcr.io/leinonen/go-hello:798e61c16e04543f77926124335fb67216023d9d
           ports:
             - containerPort: 8080
           envFrom:
