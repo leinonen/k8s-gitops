@@ -1,0 +1,89 @@
+# CI renders this into k8s-gitops apps/minesweeper/ with ghcr.io/leinonen/app-factory/minesweeper:3b2e7c80c6881d515e1123ae5d5cf530e7b3e46e set to the built image.
+# Namespace minesweeper is created by ArgoCD.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minesweeper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minesweeper
+  template:
+    metadata:
+      labels:
+        app: minesweeper
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      containers:
+        - name: minesweeper
+          image: ghcr.io/leinonen/app-factory/minesweeper:3b2e7c80c6881d515e1123ae5d5cf530e7b3e46e
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          # Keep serving while Traefik drops the pod from its endpoints.
+          lifecycle:
+            preStop:
+              sleep: { seconds: 5 }
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minesweeper
+spec:
+  selector:
+    app: minesweeper
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minesweeper
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: minesweeper.k8s.leinonen.ninja
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minesweeper
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - minesweeper.k8s.leinonen.ninja
+      secretName: minesweeper-tls
+---
+# Pull secret for the private GHCR package, shared by all factory apps.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: ghcr
+spec:
+  secretStoreRef: { kind: ClusterSecretStore, name: ssm }
+  target:
+    name: ghcr
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: '{"auths":{"ghcr.io":{"auth":"{{ printf "leinonen:%s" .token | b64enc }}"}}}'
+  data:
+    - secretKey: token
+      remoteRef: { key: /k8s/shared/ghcr-token }
