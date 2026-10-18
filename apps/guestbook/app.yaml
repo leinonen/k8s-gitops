@@ -1,0 +1,89 @@
+# Copied to k8s-gitops apps/guestbook/ by CI, with ghcr.io/leinonen/guestbook:311026e426eb68041c2ab57b80b0c26809b12113 set to the built image.
+# Namespace guestbook is created by ArgoCD.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guestbook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guestbook
+  template:
+    metadata:
+      labels:
+        app: guestbook
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      containers:
+        - name: guestbook
+          image: ghcr.io/leinonen/guestbook:311026e426eb68041c2ab57b80b0c26809b12113
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          # Keep serving while Traefik drops the pod from its endpoints.
+          lifecycle:
+            preStop:
+              sleep: { seconds: 5 }
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guestbook
+spec:
+  selector:
+    app: guestbook
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: guestbook
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: guestbook.k8s.leinonen.ninja
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: guestbook
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - guestbook.k8s.leinonen.ninja
+      secretName: guestbook-tls
+---
+# Pull secret for the private GHCR package, shared by all factory apps.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: ghcr
+spec:
+  secretStoreRef: { kind: ClusterSecretStore, name: ssm }
+  target:
+    name: ghcr
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: '{"auths":{"ghcr.io":{"auth":"{{ printf "leinonen:%s" .token | b64enc }}"}}}'
+  data:
+    - secretKey: token
+      remoteRef: { key: /k8s/shared/ghcr-token }
