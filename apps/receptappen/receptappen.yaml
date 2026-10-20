@@ -1,0 +1,146 @@
+# Receptappen: household meal planner from private repo leinonen/meal-planner.
+# Image tag is bumped by its CI on every push to main. Data in database
+# receptappen on shared-postgres, photos in S3 (infrastructure stacks/k8s
+# receptappen.tf) through the instance role.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: receptappen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: receptappen
+  template:
+    metadata:
+      labels:
+        app: receptappen
+    spec:
+      imagePullSecrets:
+        - name: ghcr
+      securityContext:
+        runAsNonRoot: true
+      volumes:
+        - name: rds-ca
+          configMap:
+            name: rds-ca
+      containers:
+        - name: receptappen
+          image: ghcr.io/leinonen/meal-planner:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - { name: MEMBERS, value: "Peter,Claudia" }
+            - { name: S3_BUCKET, value: receptappen-c4b98583aeb24e7bb542d77d8c }
+            - { name: AWS_REGION, value: eu-north-1 }
+          envFrom:
+            - secretRef:
+                name: receptappen
+            - secretRef:
+                name: db
+          volumeMounts:
+            - name: rds-ca
+              mountPath: /etc/rds
+              readOnly: true
+          readinessProbe:
+            httpGet: { path: /readyz, port: 8080 }
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+          # Native sleep action: the distroless image has no sleep binary.
+          lifecycle:
+            preStop:
+              sleep: { seconds: 5 }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: receptappen
+spec:
+  selector:
+    app: receptappen
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: receptappen
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: recept.k8s.leinonen.ninja
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: receptappen
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - recept.k8s.leinonen.ninja
+      secretName: receptappen-tls
+---
+# Pull secret for the private GHCR package: classic PAT with read:packages.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: ghcr
+spec:
+  secretStoreRef: { kind: ClusterSecretStore, name: ssm }
+  target:
+    name: ghcr
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: '{"auths":{"ghcr.io":{"auth":"{{ printf "leinonen:%s" .token | b64enc }}"}}}'
+  data:
+    - secretKey: token
+      remoteRef: { key: /k8s/receptappen/ghcr-token }
+---
+# PASSWORD_HASH: bcrypt of the household password (`receptappen hash-password`).
+# SESSION_KEY: signs the login cookie (`openssl rand -base64 32`).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: receptappen
+spec:
+  secretStoreRef: { kind: ClusterSecretStore, name: ssm }
+  target:
+    name: receptappen
+  data:
+    - secretKey: PASSWORD_HASH
+      remoteRef: { key: /k8s/receptappen/password-hash }
+    - secretKey: SESSION_KEY
+      remoteRef: { key: /k8s/receptappen/session-key }
+---
+# DATABASE_URL for database receptappen on shared-postgres (infrastructure stacks/postgres).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: db
+spec:
+  secretStoreRef: { kind: ClusterSecretStore, name: ssm }
+  target:
+    name: db
+    template:
+      data:
+        DATABASE_URL: 'postgres://receptappen:{{ .password }}@shared-postgres.cle7r5x9plzj.eu-north-1.rds.amazonaws.com:5432/receptappen?sslmode=verify-full&sslrootcert=/etc/rds/ca.pem'
+  data:
+    - secretKey: password
+      remoteRef: { key: /k8s/receptappen/db-password }
