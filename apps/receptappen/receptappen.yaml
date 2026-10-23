@@ -115,6 +115,7 @@ spec:
 ---
 # PASSWORD_HASH: bcrypt of the household password (`receptappen hash-password`).
 # SESSION_KEY: signs the login cookie (`openssl rand -base64 32`).
+# ANTHROPIC_API_KEY: Claude API key for "Fyll i med AI" on recipe steps.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -128,6 +129,8 @@ spec:
       remoteRef: { key: /k8s/receptappen/password-hash }
     - secretKey: SESSION_KEY
       remoteRef: { key: /k8s/receptappen/session-key }
+    - secretKey: ANTHROPIC_API_KEY
+      remoteRef: { key: /k8s/receptappen/anthropic-api-key }
 ---
 # DATABASE_URL for database receptappen on shared-postgres (infrastructure stacks/postgres).
 apiVersion: external-secrets.io/v1
