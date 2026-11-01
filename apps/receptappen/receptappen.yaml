@@ -26,7 +26,7 @@ spec:
             name: rds-ca
       containers:
         - name: receptappen
-          image: ghcr.io/leinonen/meal-planner:c5a6b3f96299a728ad9e7d20c812feaeb2585dc1
+          image: ghcr.io/leinonen/meal-planner:8f4d6d109562203f4c0bcbe1ef22a34cbcbfe9b7
           ports:
             - containerPort: 8080
           env:
